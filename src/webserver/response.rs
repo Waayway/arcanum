@@ -9,8 +9,8 @@ pub struct ResponseConstruction {
 }
 
 impl ResponseConstruction {
-    pub fn generate_response(status_code: i32, res: Response) -> Self {
-        let response = "HTTP/1.1 {status_code}";
+    pub fn generate_response(res: Response) -> Self {
+        let response = format!("HTTP/1.1 {status_code}", status_code = res.status_code);
         Self {
             base_response: response.to_owned(),
             headers: res.headers,
@@ -24,7 +24,6 @@ impl ResponseConstruction {
     pub fn add_content(&mut self, content: &str) {
         self.content += content;
     }
-
     pub fn set_raw_data(&mut self, data: Vec<u8>) {
         self.data = data;
     }
@@ -46,16 +45,21 @@ impl ResponseConstruction {
 
 pub struct Response {
     headers: HashMap<String, String>,
+    status_code: i32
 }
 impl Response {
     pub fn new() -> Self {
         Self {
             headers: HashMap::new(),
+            status_code: 200
         }
     }
     pub fn add_header(&mut self, header: &str, value: &str) {
         self.headers.insert(header.to_owned(), value.to_owned());
     } 
+    pub fn set_status_code(&mut self, status_code: i32) {
+        self.status_code = status_code;
+    }
 }
 
 
