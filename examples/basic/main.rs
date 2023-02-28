@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use mvc_rust_framework::{serve_static_file, Request, Response, ReturnData, Template, WebServer};
+use arcanum::{serve_static_file, Request, Response, ReturnData, Template, WebServer};
 use serde::Serialize;
 
 fn main() {
