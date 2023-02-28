@@ -5,7 +5,6 @@ use tinytemplate::TinyTemplate;
 
 pub struct Template {}
 
-
 impl Template {
     pub fn render_template<T>(file_path: &str, context: T) -> String where T: Serialize  {
         let mut tt = TinyTemplate::new();

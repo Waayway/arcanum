@@ -1,4 +1,3 @@
-// # Imports
 use std::{
     collections::HashMap,
     fs,
@@ -6,18 +5,12 @@ use std::{
     net::{TcpListener, TcpStream},
     path::Path,
     process::exit,
+    thread,
 };
-pub mod models;
-pub mod request;
-pub mod response;
-pub mod routes;
-pub mod serve_files;
-pub mod templates;
-use request::Request;
-use response::{Response, ResponseConstruction};
 
-use self::{response::ReturnData, serve_files::serve_static_file};
+use crate::{request::Request, response::{Response, ReturnData, ResponseConstruction}, serve_files::serve_static_file};
 
+#[derive(Clone)]
 enum RouteHandler {
     WithRouteParams(fn(Request, &mut Response, HashMap<String, String>) -> ReturnData),
     Simple(fn(Request, &mut Response) -> ReturnData),
@@ -72,13 +65,10 @@ impl WebServer {
             route.to_owned(),
             RouteHandler::WithRouteAndOptionalParams(
                 |_req: Request, res: &mut Response, params: HashMap<String, String>| {
-                    for i in &params {
-                        println!("{:?}", i);
-                    }
                     if !params.contains_key("basepath") {
                         res.set_status_code(500);
                         return ReturnData::Text("Something went wrong!".to_string());
-                    } 
+                    }
                     if !params.contains_key("path") {
                         res.set_status_code(403);
                         return ReturnData::Text("Cannot index folders".to_string());
@@ -97,14 +87,16 @@ impl WebServer {
     pub fn run(&self) {
         for stream in self.listener.incoming() {
             let stream = stream.unwrap();
-
-            println!("INFO: Connection Established!");
-            self.handle_connection(stream);
+            
+            // println!("INFO: Connection Established!");
+            let all_routes = self.routes.clone();
+            thread::spawn(move || {
+                Self::handle_connection(all_routes, stream);
+            });
         }
     }
 
-
-    fn handle_connection(&self, mut stream: TcpStream) {
+    fn handle_connection(all_routes: HashMap<String, RouteHandler>, mut stream: TcpStream) {
         let buf_reader = BufReader::new(&mut stream);
         let http_request: Vec<_> = buf_reader
             .lines()
@@ -116,14 +108,14 @@ impl WebServer {
 
         let route = http_iter.next().unwrap();
 
-        let mut request = Request::new(&self.compute_route_request(route));
+        let mut request = Request::new(&Self::compute_route_request(route));
         let mut response = Response::new();
 
         for i in http_iter {
             request.add_header(i);
         }
 
-        let content = self.handle_routes(route, request, &mut response);
+        let content = Self::handle_routes(all_routes, route, request, &mut response);
         // println!("INFO: Request {:#?}", http_request);
 
         let mut response = ResponseConstruction::generate_response(response);
@@ -140,7 +132,7 @@ impl WebServer {
         });
     }
 
-    fn compute_route_request(&self, route: &str) -> [String; 3] {
+    fn compute_route_request(route: &str) -> [String; 3] {
         let splitted_route: Vec<&str> = route.split(" ").collect();
         [
             splitted_route[0].to_owned(),
@@ -151,7 +143,7 @@ impl WebServer {
     // # Parse path params, so :id for example
     // @param route, ROUTE so the configured route
     // @param path, PATH so the path to the current page
-    fn parse_path_params(&self, route: &str, path: &str) -> HashMap<String, String> {
+    fn parse_path_params(route: &str, path: &str) -> HashMap<String, String> {
         let route_parts: Vec<&str> = route.split('/').collect();
         let path_parts: Vec<&str> = path.split('/').collect();
         let mut map: HashMap<String, String> = HashMap::new();
@@ -170,10 +162,10 @@ impl WebServer {
         map
     }
 
-    fn does_path_exists_in_routes(&self, path: &str) -> Option<String> {
+    fn does_path_exists_in_routes(all_routes: &HashMap<String, RouteHandler>, path: &str) -> Option<String> {
         let mut current_path = None;
         let path_parts: Vec<&str> = path.split("/").filter(|i| !i.is_empty()).collect();
-        for i in &self.routes {
+        for i in all_routes {
             let route_parts: Vec<&str> = i.0.split("/").filter(|i| !i.is_empty()).collect();
             // DEBUG: println!("route_parts: {route_parts:?}\n path_parts: {path_parts:?}\n");
             // if route_parts.len() != path_parts.len() {
@@ -203,9 +195,9 @@ impl WebServer {
         current_path
     }
 
-    fn handle_routes(&self, route: &str, req: Request, res: &mut Response) -> ReturnData {
-        let route_data = self.compute_route_request(route);
-        let route_path = self.does_path_exists_in_routes(&route_data[1]);
+    fn handle_routes(all_routes: HashMap<String, RouteHandler>, route: &str, req: Request, res: &mut Response) -> ReturnData {
+        let route_data = Self::compute_route_request(route);
+        let route_path = Self::does_path_exists_in_routes(&all_routes, &route_data[1]);
 
         if route_path.is_none() {
             return ReturnData::Text(
@@ -214,11 +206,15 @@ impl WebServer {
             );
         }
         let route = route_path.unwrap();
-        let path_params = self.parse_path_params(&route, &route_data[1]);
-        match self.routes[&route] {
+        let path_params = Self::parse_path_params(&route, &route_data[1]);
+        match all_routes[&route] {
             RouteHandler::Simple(handler) => handler(req, res),
             RouteHandler::WithRouteParams(handler) => handler(req, res, path_params),
-            RouteHandler::WithRouteAndOptionalParams(handler, ref opt_params) => handler(req, res, path_params.into_iter().chain(opt_params.clone()).collect()),
+            RouteHandler::WithRouteAndOptionalParams(handler, ref opt_params) => handler(
+                req,
+                res,
+                path_params.into_iter().chain(opt_params.clone()).collect(),
+            ),
         }
     }
 }
