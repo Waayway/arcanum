@@ -5,8 +5,10 @@ mod models;
 mod request;
 mod response;
 mod serve_files;
-mod templates;  
+mod templates;
+mod router;
 
+pub use router::Router;
 pub use webserver::WebServer;
 pub use request::{Request};
 pub use response::{Response, ReturnData};

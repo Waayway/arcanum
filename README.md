@@ -1,4 +1,6 @@
 # Arcanum
+**THIS PROJECT IS STILL IN DEVELOPMENT SO IT ISN'T DONE YET AND THINGS WILL CHANGE**
+
 
 This is a side project i've started to create a simple framework for myself.
 
@@ -8,6 +10,7 @@ TODO list:
 -   [x] Templating
 -   [ ] Models (DB)
 -   [ ] docs
+
 
 ## How to use
 to use this library add
