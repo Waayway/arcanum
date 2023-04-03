@@ -82,15 +82,14 @@ impl WebServer {
     fn handle_connection(
         internal_router: Router,
         other_routers: Vec<Router>,
-        mut req: Req,
+        req: Req,
     ) {
-        let mut request = Request::new(&req);
+        let request = Request::new(&req);
         let mut response = Response::new();
 
         let content = Self::handle_routes(
             internal_router,
             other_routers,
-            req.url(),
             request,
             &mut response,
         );
@@ -107,7 +106,7 @@ impl WebServer {
             }
         }
 
-        let mut raw_response = response.render_response();
+        let raw_response = response.render_response();
         req.respond(raw_response).unwrap_or_else(|err| {
             eprintln!("ERROR: Couldn't write content to stream: {err}");
         });
@@ -138,7 +137,6 @@ impl WebServer {
     fn handle_routes(
         internal_router: Router,
         other_routers: Vec<Router>,
-        route: &str,
         req: Request,
         res: &mut Response,
     ) -> ReturnData {

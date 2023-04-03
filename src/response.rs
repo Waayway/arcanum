@@ -11,7 +11,6 @@ pub struct ResponseConstruction {
 
 impl ResponseConstruction {
     pub fn generate_response(res: Response) -> Self {
-        let response = format!("HTTP/1.1 {status_code}", status_code = res.status_code);
         Self {
             headers: res.headers,
             content: "".to_owned(),
@@ -29,15 +28,13 @@ impl ResponseConstruction {
         self.data = data;
     }
     pub fn render_response(&self) -> Res<Cursor<Vec<u8>>> { 
-        let mut newData: Vec<u8>;
+        let new_data: Vec<u8>;
         if self.data.len() < 1 {
-            let content_length = self.content.len();
-            newData = format!("{}", self.content).as_bytes().to_vec()
+            new_data = format!("{}", self.content).as_bytes().to_vec()
         } else {
-            let content_length = self.data.len();
-            newData = self.data.clone();
+            new_data = self.data.clone();
         }
-        let mut response = Res::from_data(newData);
+        let mut response = Res::from_data(new_data);
         for i in self.headers.iter() {
             response.add_header(tiny_http::Header::from_str(&format!("{}: {}", i.0,i.1)).unwrap());
         }
