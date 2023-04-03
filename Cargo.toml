@@ -1,6 +1,6 @@
 [package]
 name = "arcanum"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Waayway"]
 description = "A simple library to create web applications with a Django inspired interface"
 homepage = "https://github.com/Waayway/arcanum"
