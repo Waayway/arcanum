@@ -1,8 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Cursor, str::FromStr};
+
+use tiny_http::Response as Res;
 
 
 pub struct ResponseConstruction {
-    base_response: String,
     headers: HashMap<String, String>,
     content: String,
     data: Vec<u8>,
@@ -12,12 +13,12 @@ impl ResponseConstruction {
     pub fn generate_response(res: Response) -> Self {
         let response = format!("HTTP/1.1 {status_code}", status_code = res.status_code);
         Self {
-            base_response: response.to_owned(),
             headers: res.headers,
             content: "".to_owned(),
             data: vec![]
         }
     }
+    
     pub fn add_header(&mut self, header: &str, value: &str) {
         self.headers.insert(header.to_owned(), value.to_owned());
     } 
@@ -27,18 +28,20 @@ impl ResponseConstruction {
     pub fn set_raw_data(&mut self, data: Vec<u8>) {
         self.data = data;
     }
-    pub fn render_response(&self) -> String { 
-        let headers: String = self.headers.iter().map(|(header, value)| format!("{header}: {value}\r\n")).collect();
+    pub fn render_response(&self) -> Res<Cursor<Vec<u8>>> { 
+        let mut newData: Vec<u8>;
         if self.data.len() < 1 {
             let content_length = self.content.len();
-            format!("{}\r\nContent-Length: {content_length}\r\n{headers}\r\n{}", self.base_response, self.content)
+            newData = format!("{}", self.content).as_bytes().to_vec()
         } else {
             let content_length = self.data.len();
-            format!("{}\r\nContent-Length: {content_length}\r\n{headers}\r\n", self.base_response)
+            newData = self.data.clone();
         }
-    }
-    pub fn get_raw_data_if_any(&self) -> Vec<u8> {
-        return self.data.clone();
+        let mut response = Res::from_data(newData);
+        for i in self.headers.iter() {
+            response.add_header(tiny_http::Header::from_str(&format!("{}: {}", i.0,i.1)).unwrap());
+        }
+        response
     }
 }
 
@@ -65,5 +68,6 @@ impl Response {
 
 pub enum ReturnData {
     RawData(Vec<u8>),
-    Text(String)
+    Text(String),
+    Json(String)
 }

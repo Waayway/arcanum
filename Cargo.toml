@@ -18,3 +18,4 @@ edition = "2021"
 tinytemplate = "1.2.1"
 serde = { version = "1.0", features = ["derive"] }
 new_mime_guess = "4.0.1"
+tiny_http = "0.12.0"

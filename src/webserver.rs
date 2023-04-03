@@ -1,8 +1,6 @@
 use std::{
     collections::HashMap,
     fs,
-    io::{BufRead, BufReader, Write},
-    net::{TcpListener, TcpStream},
     process::exit,
     thread, vec,
 };
@@ -12,6 +10,7 @@ use crate::{
     response::{Response, ResponseConstruction, ReturnData},
     router::Router,
 };
+use tiny_http::{Server, Request as Req};
 
 #[derive(Clone)]
 pub enum RouteHandler {
@@ -24,14 +23,14 @@ pub enum RouteHandler {
 }
 
 pub struct WebServer {
-    listener: TcpListener,
+    server: Server,
     internal_router: Router,
     routers: Vec<Router>,
 }
 
 impl WebServer {
     pub fn new(ip: &str, port: i32) -> Self {
-        let listener = TcpListener::bind(format!("{ip}:{port}")).unwrap_or_else(|err| {
+        let server = tiny_http::Server::http(format!("{ip}:{port}")).unwrap_or_else(|err| {
             eprintln!("ERROR: Cannot setup the server port or ip {err}");
             exit(1);
         });
@@ -39,7 +38,7 @@ impl WebServer {
         println!("INFO: server started at http://{ip}:{port}/");
         let internal_router = Router::new("/");
         Self {
-            listener: listener,
+            server: server,
             internal_router: internal_router,
             routers: vec![],
         }
@@ -70,14 +69,12 @@ impl WebServer {
     }
 
     pub fn run(&self) {
-        for stream in self.listener.incoming() {
-            let stream = stream.unwrap();
-
+        while let Ok(req) = self.server.recv() {
             // println!("INFO: Connection Established!");
             let internal_router = self.internal_router.clone();
             let other_routers = self.routers.clone();
             thread::spawn(move || {
-                Self::handle_connection(internal_router, other_routers, stream);
+                Self::handle_connection(internal_router, other_routers, req);
             });
         }
     }
@@ -85,30 +82,15 @@ impl WebServer {
     fn handle_connection(
         internal_router: Router,
         other_routers: Vec<Router>,
-        mut stream: TcpStream,
+        mut req: Req,
     ) {
-        let buf_reader = BufReader::new(&mut stream);
-        let http_request: Vec<_> = buf_reader
-            .lines()
-            .map(|result| result.unwrap())
-            .take_while(|line| !line.is_empty())
-            .collect();
-
-        let mut http_iter = http_request.iter();
-
-        let route = http_iter.next().unwrap();
-
-        let mut request = Request::new(&Self::compute_route_request(route));
+        let mut request = Request::new(&req);
         let mut response = Response::new();
-
-        for i in http_iter {
-            request.add_header(i);
-        }
 
         let content = Self::handle_routes(
             internal_router,
             other_routers,
-            route,
+            req.url(),
             request,
             &mut response,
         );
@@ -119,21 +101,16 @@ impl WebServer {
         match content {
             ReturnData::RawData(data) => response.set_raw_data(data),
             ReturnData::Text(text) => response.add_content(&text),
+            ReturnData::Json(json) => {
+                response.add_header("Content-Type", "application/json");
+                response.add_content(&json);
+            }
         }
 
-        let mut raw_response = response.render_response().as_bytes().to_vec();
-        raw_response.append(&mut response.get_raw_data_if_any().clone());
-        stream.write_all(&raw_response).unwrap_or_else(|err| {
+        let mut raw_response = response.render_response();
+        req.respond(raw_response).unwrap_or_else(|err| {
             eprintln!("ERROR: Couldn't write content to stream: {err}");
         });
-    }
-    fn compute_route_request(route: &str) -> [String; 3] {
-        let splitted_route: Vec<&str> = route.split(" ").collect();
-        [
-            splitted_route[0].to_owned(),
-            splitted_route[1].to_owned(),
-            splitted_route[2].to_owned(),
-        ]
     }
 
     // # Parse path params, so :id for example
@@ -165,18 +142,18 @@ impl WebServer {
         req: Request,
         res: &mut Response,
     ) -> ReturnData {
-        let route_data = Self::compute_route_request(route);
-        let mut route_path = internal_router.does_path_exists(&route_data[1]);
+        let mut route_path = internal_router.does_path_exists(&req.route);
+        // println!("{:?}",route_path);
         let mut route_handler: Option<RouteHandler> = None;
         if route_path.is_none() {
             for i in other_routers {
-                if let Some(temp) = i.does_path_exists(&route_data[1]) {
+                if let Some(temp) = i.does_path_exists(&req.route) {
                     route_path = Some(temp.clone());
-                    route_handler = i.RouteHandlerFromPath(temp.clone())
+                    route_handler = i.route_handler_from_path(temp.clone())
                 }
             }
         } else {
-            route_handler = internal_router.RouteHandlerFromPath(route_path.as_deref().unwrap().to_string());
+            route_handler = internal_router.route_handler_from_path(route_path.as_deref().unwrap().to_string());
         }
 
         if route_path.clone().is_none() {
@@ -187,7 +164,7 @@ impl WebServer {
         }
         
         let route = route_path.unwrap();
-        let path_params = Self::parse_path_params(&route, &route_data[1]);
+        let path_params = Self::parse_path_params(&route, &req.route);
         match route_handler.unwrap() {
             RouteHandler::Simple(handler) => handler(req, res),
             RouteHandler::WithRouteParams(handler) => handler(req, res, path_params),

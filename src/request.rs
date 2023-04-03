@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use tiny_http::Request as Req;
+
 pub struct Request {
     pub headers: HashMap<String, String>,
     pub connection_type: String,
@@ -7,11 +9,11 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn new(route: &[String; 3]) -> Self {
+    pub fn new(req: &Req) -> Self {
         Self {
             headers: HashMap::new(),
-            connection_type: route[0].clone(),
-            route: "".to_string()
+            connection_type: req.http_version().to_string(),
+            route: req.url().to_string()
         }
     }
     pub fn add_header(&mut self, header: &str) {

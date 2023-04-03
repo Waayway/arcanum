@@ -70,6 +70,7 @@ impl Router {
         let path_parts: Vec<&str> = path.split("/").filter(|i| !i.is_empty()).collect();
         for i in self.routes.clone() {
             let mut route_parts: Vec<&str> = i.0.split("/").filter(|i| !i.is_empty()).collect();
+            // println!("route_parts: {route_parts:?}\n path_parts: {path_parts:?}\n")
             let basepath_parts: Vec<&str> = self.basepath.split("/").filter(|i| !i.is_empty()).collect();
             route_parts.extend(basepath_parts);
             // println!("route_parts: {route_parts:?}\n path_parts: {path_parts:?}\n");
@@ -105,7 +106,7 @@ impl Router {
         // DEBUG: println!("{:?}", current_path);
         current_path
     }
-    pub fn RouteHandlerFromPath(&self, path: String) -> Option<RouteHandler> {
+    pub fn route_handler_from_path(&self, path: String) -> Option<RouteHandler> {
         if self.routes.keys().any(|i| i == &path) {
             return Some(self.routes[&path].clone());
         }
