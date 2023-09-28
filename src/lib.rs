@@ -7,6 +7,7 @@ pub mod router;
 pub mod serve;
 pub mod controller;
 pub mod templates;
+pub mod db;
 
 pub struct ApplicationController {
     pub router: Arc<router::Router>,

@@ -1,4 +1,4 @@
-use crate::{router::{Method, RouteHandler}, templates::Templates};
+use crate::{router::{Method, RouteHandler}, templates::Templates, db};
 
 
 pub trait Routing {
@@ -34,6 +34,20 @@ impl BaseController {
         match self.templates.render(template_name, context) {
             Ok(s) => s,
             Err(e) => format!("Error: {}", e),
+        }
+    }
+}
+
+
+#[derive(Clone)]
+pub struct BaseModel {
+    bs: BaseController,
+}
+
+impl BaseModel {
+    pub fn new(bs: BaseController) -> Self {
+        Self {
+            bs,
         }
     }
 }
